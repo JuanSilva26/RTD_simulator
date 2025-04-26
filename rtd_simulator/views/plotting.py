@@ -702,8 +702,10 @@ class RTDPlotter:
         
         if 'iv_fit' in analysis_data:
             v_fit, i_fit, params = analysis_data['iv_fit']
+            # Check if r_squared is available, otherwise use a default message
+            r_squared_text = f'R² = {params.get("r_squared", 0):.3f}' if isinstance(params, dict) else ''
             ax_iv.plot(v_fit, i_fit, 'r--', 
-                      label=f'Fit (R² = {params["r_squared"]:.3f})')
+                      label=f'Fit ({r_squared_text})')
             
         if 'peaks' in analysis_data:
             peaks = analysis_data['peaks']
@@ -722,13 +724,13 @@ class RTDPlotter:
         ax_stats = self.figure.add_subplot(gs[1, 0])
         stats = self.analyzer.calculate_statistics(v_range, i_values)
         stats_text = (f"Voltage Statistics:\n"
-                     f"  Mean: {stats['v_mean']:.2f}V\n"
-                     f"  Std Dev: {stats['v_std']:.2f}V\n"
-                     f"  Range: [{stats['v_min']:.2f}, {stats['v_max']:.2f}]V\n\n"
+                     f"  Mean: {stats['x_mean']:.2f}V\n"
+                     f"  Std Dev: {stats['x_std']:.2f}V\n"
+                     f"  Range: [{stats['x_min']:.2f}, {stats['x_max']:.2f}]V\n\n"
                      f"Current Statistics:\n"
-                     f"  Mean: {stats['i_mean']:.2f}A\n"
-                     f"  Std Dev: {stats['i_std']:.2f}A\n"
-                     f"  Range: [{stats['i_min']:.2f}, {stats['i_max']:.2f}]A")
+                     f"  Mean: {stats['y_mean']:.2f}A\n"
+                     f"  Std Dev: {stats['y_std']:.2f}A\n"
+                     f"  Range: [{stats['y_min']:.2f}, {stats['y_max']:.2f}]A")
         
         ax_stats.text(0.5, 0.5, stats_text,
                      horizontalalignment='center',
@@ -742,11 +744,228 @@ class RTDPlotter:
         # Frequency analysis
         ax_freq = self.figure.add_subplot(gs[1, 1])
         freq_data = self.analyzer.analyze_frequency(v_range, i_values)
-        ax_freq.semilogy(freq_data['frequencies'], freq_data['magnitudes'])
+        ax_freq.semilogy(freq_data['frequencies'], freq_data['amplitudes'])
         ax_freq.set_xlabel('Frequency (Hz)')
         ax_freq.set_ylabel('Magnitude')
         ax_freq.set_title('Frequency Analysis')
         ax_freq.grid(True)
+        
+        self.figure.tight_layout()
+        
+    def plot_advanced_iv_analysis(self, v_range: NDArray, i_values: NDArray, 
+                               peak_params: Optional[Dict[str, Any]] = None) -> None:
+        """
+        Plot advanced IV curve analysis with detailed peak detection.
+        
+        Args:
+            v_range: Voltage array
+            i_values: Current array
+            peak_params: Optional parameters for peak detection
+        """
+        self.figure.clear()
+        
+        # Use default peak detection parameters if none provided
+        peak_params_dict: Dict[str, Any] = {} if peak_params is None else peak_params
+        
+        # Get advanced peak detection results
+        peak_results = self.analyzer.advanced_peak_detection(v_range, i_values, **peak_params_dict)
+        
+        # Create grid layout for multiple plots
+        gs = GridSpec(3, 2, figure=self.figure, height_ratios=[2, 1, 1])
+        
+        # Main IV curve plot with peaks and valleys
+        ax_iv = self.figure.add_subplot(gs[0, :])
+        ax_iv.plot(v_range, i_values, 'b-', label='IV Curve', alpha=0.7, linewidth=1.5)
+        
+        # Determine voltage range based on data
+        v_min, v_max = v_range.min(), v_range.max()
+        # Check if we're likely using a Schulman model by looking at voltage range
+        if v_min >= 0 and v_max > 3.0:
+            # Schulman model typically uses 0 to 4.5V
+            ax_iv.set_xlim(0, 4.5)
+        elif v_min < 0:
+            # Simplified model typically uses -3 to 3V
+            ax_iv.set_xlim(-3, 3)
+            
+        # Make sure y-axis shows the full curve
+        i_buffer = (i_values.max() - i_values.min()) * 0.1  # 10% buffer
+        ax_iv.set_ylim(i_values.min() - i_buffer, i_values.max() + i_buffer)
+        
+        # Plot peaks with color based on sharpness
+        if peak_results['peaks']:
+            peak_x = [p['x'] for p in peak_results['peaks']]
+            peak_y = [p['y'] for p in peak_results['peaks']]
+            sharpness = [p['sharpness'] for p in peak_results['peaks']]
+            
+            # Use colormap to visualize sharpness (more negative = sharper)
+            import matplotlib.cm as cm
+            from matplotlib.colors import Normalize
+            
+            min_sharp = min(sharpness) if sharpness and None not in sharpness else -1
+            max_sharp = max(sharpness) if sharpness and None not in sharpness else 1
+            norm = Normalize(min_sharp, max_sharp)
+            
+            cmap = cm.get_cmap('coolwarm')  # Standard red-blue colormap
+            
+            # Plot each peak with appropriate color
+            for i, (x, y, sharp) in enumerate(zip(peak_x, peak_y, sharpness)):
+                if sharp is not None:
+                    color = cmap(norm(sharp))
+                else:
+                    color = 'gray'  # Default color for None values
+                
+                ax_iv.plot(x, y, 'o', markersize=8, 
+                        color=color, 
+                        markeredgecolor='black',
+                        markeredgewidth=1,
+                        label=f'Peak {i+1}' if i == 0 else "")
+                
+                # Annotate peak with its number
+                ax_iv.annotate(f'{i+1}', 
+                             (x, y), 
+                             xytext=(5, 5),
+                             textcoords='offset points',
+                             fontsize=8,
+                             bbox=dict(boxstyle='round,pad=0.3', 
+                                     fc='white', 
+                                     alpha=0.7))
+                
+                # Visualize peak width
+                if 'width_left' in peak_results['peaks'][i] and 'width_right' in peak_results['peaks'][i]:
+                    width_left = peak_results['peaks'][i]['width_left']
+                    width_right = peak_results['peaks'][i]['width_right']
+                    width_height = y - peak_results['peaks'][i]['prominence'] * 0.5 if peak_results['peaks'][i]['prominence'] is not None else y * 0.9
+                    
+                    # Draw horizontal line for width
+                    ax_iv.hlines(width_height, width_left, width_right, 
+                               color=color, 
+                               linestyle=':',
+                               alpha=0.7)
+                    
+                    # Draw vertical lines at width boundaries
+                    prominence_factor = peak_results['peaks'][i]['prominence'] * 0.1 if peak_results['peaks'][i]['prominence'] is not None else y * 0.05
+                    ax_iv.vlines([width_left, width_right], 
+                               width_height - prominence_factor,
+                               width_height + prominence_factor,
+                               color=color,
+                               alpha=0.7)
+        
+        # Plot valleys
+        if peak_results['valleys']:
+            valley_x = [v['x'] for v in peak_results['valleys']]
+            valley_y = [v['y'] for v in peak_results['valleys']]
+            ax_iv.plot(valley_x, valley_y, 'mo', markersize=8, 
+                     markeredgecolor='black', 
+                     markeredgewidth=1,
+                     label='Valleys')
+            
+            # Annotate valleys
+            for i, (x, y) in enumerate(zip(valley_x, valley_y)):
+                ax_iv.annotate(f'V{i+1}', 
+                             (x, y), 
+                             xytext=(5, -10),
+                             textcoords='offset points',
+                             fontsize=8,
+                             bbox=dict(boxstyle='round,pad=0.3', 
+                                     fc='white', 
+                                     alpha=0.7))
+        
+        # Add colorbar for peak sharpness
+        if peak_results['peaks']:
+            sm = cm.ScalarMappable(cmap=cmap, norm=norm)
+            sm.set_array([])
+            cbar = self.figure.colorbar(sm, ax=ax_iv)
+            cbar.set_label('Peak Sharpness (d²I/dV²)')
+        
+        # Add peak count annotation
+        peak_info = (f"Found {peak_results['peak_count']} peaks, "
+                   f"{peak_results['valley_count']} valleys")
+        ax_iv.text(0.02, 0.98, peak_info,
+                 transform=ax_iv.transAxes,
+                 verticalalignment='top',
+                 horizontalalignment='left',
+                 bbox=dict(boxstyle='round', facecolor='white', alpha=0.8))
+        
+        ax_iv.set_xlabel('Voltage (V)')
+        ax_iv.set_ylabel('Current (A)')
+        ax_iv.set_title('IV Analysis')
+        ax_iv.grid(True, alpha=0.3)
+        ax_iv.legend(loc='upper right')
+        
+        # Plot derivatives to help understand peak detection
+        ax_deriv1 = self.figure.add_subplot(gs[1, 0])
+        ax_deriv1.plot(v_range, peak_results['dy_dx'], 'g-', 
+                      label='First Derivative (dI/dV)')
+        ax_deriv1.axhline(y=0, color='k', linestyle='--', alpha=0.3)
+        
+        # Mark zero crossings on first derivative (extrema of original)
+        zero_crossings = np.where(np.diff(np.signbit(peak_results['dy_dx'])))[0]
+        if len(zero_crossings) > 0:
+            ax_deriv1.plot(v_range[zero_crossings], 
+                         np.zeros_like(zero_crossings, dtype=float),
+                         'ro', markersize=4, alpha=0.7)
+            
+        ax_deriv1.set_xlabel('Voltage (V)')
+        ax_deriv1.set_ylabel('dI/dV')
+        ax_deriv1.set_title('First Derivative')
+        ax_deriv1.grid(True, alpha=0.3)
+        
+        # Plot second derivative
+        ax_deriv2 = self.figure.add_subplot(gs[1, 1])
+        ax_deriv2.plot(v_range, peak_results['d2y_dx2'], 'm-', 
+                      label='Second Derivative (d²I/dV²)')
+        ax_deriv2.axhline(y=0, color='k', linestyle='--', alpha=0.3)
+        
+        # Mark peaks on second derivative plot
+        if peak_results['peaks']:
+            peak_indices = [p['index'] for p in peak_results['peaks']]
+            valid_indices = [i for i in peak_indices if i < len(peak_results['d2y_dx2'])]
+            if valid_indices:
+                peak_d2 = [peak_results['d2y_dx2'][i] for i in valid_indices]
+                valid_v = [v_range[i] for i in valid_indices if i < len(v_range)]
+                if len(valid_v) == len(peak_d2):
+                    ax_deriv2.plot(valid_v, peak_d2, 'ro', markersize=4, alpha=0.7)
+            
+        ax_deriv2.set_xlabel('Voltage (V)')
+        ax_deriv2.set_ylabel('d²I/dV²')
+        ax_deriv2.set_title('Second Derivative')
+        ax_deriv2.grid(True, alpha=0.3)
+        
+        # Peak and valley details
+        ax_details = self.figure.add_subplot(gs[2, :])
+        ax_details.axis('off')  # Hide axes
+        
+        # Create detailed text about peaks and valleys
+        details_text = "Peak Details:\n"
+        for i, peak in enumerate(peak_results['peaks'][:5]):  # Display first 5 peaks
+            width_str = f"{peak['width_x_units']:.3E}V" if peak['width_x_units'] is not None else "N/A"
+            prom_str = f"{peak['prominence']:.3E}" if peak['prominence'] is not None else "N/A"
+            details_text += f"  Peak {i+1}: V={peak['x']:.3f}V, I={peak['y']:.3E}A, Width={width_str}, Prominence={prom_str}\n"
+        
+        if len(peak_results['peaks']) > 5:
+            details_text += f"  ... and {len(peak_results['peaks']) - 5} more peaks\n"
+            
+        details_text += "\nValley Details:\n"
+        for i, valley in enumerate(peak_results['valleys'][:5]):  # Display first 5 valleys
+            details_text += (f"  Valley {i+1}: V={valley['x']:.3f}V, I={valley['y']:.3E}A\n")
+            
+        if len(peak_results['valleys']) > 5:
+            details_text += f"  ... and {len(peak_results['valleys']) - 5} more valleys\n"
+            
+        # Add peak-to-valley ratio information
+        if peak_results['peak_to_valley_ratios']:
+            details_text += "\nPeak-to-Valley Ratios:\n"
+            for i, pvr in enumerate(peak_results['peak_to_valley_ratios'][:3]):
+                details_text += (f"  P{i+1}-to-V{i+1}: "
+                               f"{pvr['ratio']:.2f} "
+                               f"({pvr['peak_x']:.2f}V → {pvr['valley_x']:.2f}V)\n")
+        
+        ax_details.text(0.5, 0.5, details_text,
+                      transform=ax_details.transAxes,
+                      verticalalignment='center',
+                      horizontalalignment='center',
+                      fontfamily='monospace',
+                      bbox=dict(boxstyle='round', facecolor='white'))
         
         self.figure.tight_layout()
         

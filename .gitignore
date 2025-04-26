@@ -1,14 +1,9 @@
-# Byte-compiled / optimized / DLL files
+# Python
 __pycache__/
 *.py[cod]
 *$py.class
-
-# C extensions
 *.so
-
-# Distribution / packaging
 .Python
-env/
 build/
 develop-eggs/
 dist/
@@ -20,26 +15,53 @@ lib64/
 parts/
 sdist/
 var/
+wheels/
 *.egg-info/
 .installed.cfg
 *.egg
+
+# Virtual Environment
+venv/
+env/
+ENV/
+.env
+
+# IDE
+.idea/
+.vscode/
+*.swp
+*.swo
+.DS_Store
+
+# Project specific
+*.log
+*.csv
+*.dat
+*.out
+*.pid
+*.seed
+*.pid.lock
+
+# Testing
+.coverage
+.tox/
+.pytest_cache/
+htmlcov/
+.coverage.*
+coverage.xml
+*.cover
 
 # Installer logs
 pip-log.txt
 pip-delete-this-directory.txt
 
 # Unit test / coverage reports
-htmlcov/
 .tox/
 .nox/
 .coverage
 .coverage.*
 .cache
 nosetests.xml
-coverage.xml
-*.cover
-.hypothesis/
-.pytest_cache/
 
 # Jupyter Notebook
 .ipynb_checkpoints
@@ -54,9 +76,6 @@ coverage.xml
 # Pyre type checker
 .pyre/
 
-# VS Code
-.vscode/
-
 # MacOS
 .DS_Store
 
@@ -65,7 +84,6 @@ logs/
 *.log
 
 # Editor directories and files
-.idea/
 *.sublime-workspace
 *.sublime-project
 
@@ -77,7 +95,6 @@ Thumbs.db
 Desktop.ini
 
 # Environment variables
-.env
 .env.*
 
 # Other

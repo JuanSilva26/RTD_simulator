@@ -2,13 +2,14 @@
 RTD simulation controller.
 """
 
-from typing import Optional, Tuple, Dict, Any, cast
+from typing import Optional, Tuple, Dict, Any, cast, Type
 import os
 import numpy as np
 import pandas as pd
 from datetime import datetime
 from PyQt6.QtWidgets import (QDialog, QVBoxLayout, QWidget, QFileDialog,
-                            QToolBar, QMainWindow, QPushButton)
+                            QToolBar, QMainWindow, QPushButton, QHBoxLayout, QLabel, QDoubleSpinBox, QSpinBox,
+                            QMessageBox)
 from PyQt6.QtCore import Qt, QObject, pyqtSignal
 from matplotlib.backends.backend_qtagg import FigureCanvasQTAgg
 from matplotlib.backends.backend_qt import NavigationToolbar2QT as NavigationToolbar
@@ -37,7 +38,11 @@ class RTDController(QObject):
         """
         super().__init__(parent)
         self.plotter = plotter
-        self.model: Optional[RTDModel] = None
+        
+        # Initialize with a default model (Simplified)
+        simplified_model = get_rtd_model("Simplified")
+        self.model = simplified_model() if simplified_model else None
+        
         self._is_running = False
         self.canvas = None
         self.toolbar = None
@@ -352,6 +357,9 @@ class RTDController(QObject):
         if self._current_simulation_data is None:
             raise ValueError("No simulation data available. Run simulation first.")
             
+        if self.model is None:
+            raise ValueError("No RTD model available. Initialize a model first.")
+            
         # Create analysis window
         dialog = QDialog()
         dialog.setWindowTitle("IV Curve Analysis")
@@ -373,16 +381,265 @@ class RTDController(QObject):
         i_values = self.model.iv_characteristic(v_range)
         
         # Get analysis results
-        i_fit, params = self.analyzer.fit_iv_curve(v_range, i_values)
+        fit_result = self.analyzer.fit_iv_curve(v_range, i_values)
+        poly = fit_result.get('polynomial')
+        if poly is not None:
+            i_fit = poly(v_range)
+            
+            # Calculate R^2 (coefficient of determination)
+            ss_tot = np.sum((i_values - np.mean(i_values))**2)
+            ss_res = np.sum((i_values - i_fit)**2)
+            r_squared = 1 - (ss_res / ss_tot) if ss_tot != 0 else 0
+            
+            # Add R^2 to the fit parameters
+            fit_params = fit_result.copy()
+            fit_params['r_squared'] = r_squared
+        else:
+            i_fit = i_values  # fallback if polynomial fit fails
+            fit_params = {}
+            
         peaks = self.analyzer.find_peaks_and_valleys(v_range, i_values)
+        
+        # Create peak analysis structure
+        peak_voltages = [p[0] for p in peaks['peaks']]
+        peak_currents = [p[1] for p in peaks['peaks']]
+        valley_voltages = [v[0] for v in peaks['valleys']]
+        valley_currents = [v[1] for v in peaks['valleys']]
         
         # Plot analysis
         analysis_data = {
-            'iv_fit': (v_range, i_fit, params),
-            'peaks': peaks
+            'iv_fit': (v_range, i_fit, fit_params),
+            'peaks': {
+                'peak_voltages': peak_voltages,
+                'peak_currents': peak_currents,
+                'valley_voltages': valley_voltages,
+                'valley_currents': valley_currents
+            }
         }
         
         analysis_plotter.plot_iv_analysis(v_range, i_values, analysis_data)
+        
+        # Show dialog
+        dialog.exec()
+        
+    def show_advanced_iv_analysis(self) -> None:
+        """Show advanced IV curve analysis with detailed peak detection."""
+        if self._current_simulation_data is None:
+            raise ValueError("No simulation data available. Run simulation first.")
+            
+        if self.model is None:
+            raise ValueError("No RTD model available. Initialize a model first.")
+            
+        # Create analysis window
+        dialog = QDialog()
+        dialog.setWindowTitle("IV Analysis")
+        dialog.setGeometry(100, 100, 1000, 800)  # Larger window for detailed analysis
+        
+        # Create layout
+        layout = QVBoxLayout(dialog)
+        
+        # Create control panel for peak detection parameters
+        control_panel = QWidget()
+        control_layout = QHBoxLayout(control_panel)
+        
+        # Add widgets for adjusting peak detection parameters
+        height_label = QLabel("Height:")
+        height_spin = QDoubleSpinBox()
+        height_spin.setRange(0.0, 100.0)
+        height_spin.setValue(0.0)  # Auto
+        height_spin.setSpecialValueText("Auto")
+        height_spin.setSuffix("%")
+        height_spin.setToolTip("Minimum peak height (percentage of range)")
+        
+        distance_label = QLabel("Distance:")
+        distance_spin = QSpinBox()
+        distance_spin.setRange(0, 200)
+        distance_spin.setValue(0)  # Auto
+        distance_spin.setSpecialValueText("Auto")
+        distance_spin.setToolTip("Minimum samples between peaks")
+        
+        prominence_label = QLabel("Prominence:")
+        prominence_spin = QDoubleSpinBox()
+        prominence_spin.setRange(0.0, 100.0)
+        prominence_spin.setValue(0.0)  # Auto
+        prominence_spin.setSpecialValueText("Auto")
+        prominence_spin.setSuffix("%")
+        prominence_spin.setToolTip("Minimum prominence (percentage of range)")
+        
+        rel_height_label = QLabel("Rel. Height:")
+        rel_height_spin = QDoubleSpinBox()
+        rel_height_spin.setRange(0.1, 1.0)
+        rel_height_spin.setValue(0.5)
+        rel_height_spin.setSingleStep(0.1)
+        rel_height_spin.setToolTip("Relative height at which peak width is measured")
+        
+        # Add button to update analysis
+        update_btn = QPushButton("Update Analysis")
+        
+        # Add widgets to layout
+        control_layout.addWidget(height_label)
+        control_layout.addWidget(height_spin)
+        control_layout.addWidget(distance_label)
+        control_layout.addWidget(distance_spin)
+        control_layout.addWidget(prominence_label)
+        control_layout.addWidget(prominence_spin)
+        control_layout.addWidget(rel_height_label)
+        control_layout.addWidget(rel_height_spin)
+        control_layout.addWidget(update_btn)
+        control_layout.addStretch()
+        
+        # Create toolbar section
+        toolbar_panel = QWidget()
+        toolbar_layout = QHBoxLayout(toolbar_panel)
+        
+        # Add export button
+        export_btn = QPushButton("Export Results")
+        export_btn.setToolTip("Export analysis results to CSV")
+        toolbar_layout.addWidget(export_btn)
+        
+        # Add help button
+        help_btn = QPushButton("Help")
+        help_btn.setToolTip("Show information about peak detection parameters")
+        toolbar_layout.addWidget(help_btn)
+        
+        toolbar_layout.addStretch()
+        
+        # Create figure for analysis plots
+        fig = Figure(figsize=(10, 8), tight_layout=True)
+        canvas = FigureCanvasQTAgg(fig)
+        
+        # Create navigation toolbar
+        nav_toolbar = NavigationToolbar(canvas, dialog)
+        
+        # Add all components to main layout
+        layout.addWidget(control_panel)
+        layout.addWidget(toolbar_panel)
+        layout.addWidget(nav_toolbar)
+        layout.addWidget(canvas)
+        
+        # Create plotter for analysis
+        analysis_plotter = RTDPlotter(fig)
+        
+        # Generate IV curve data - check the model type safely
+        schulman_model = get_rtd_model("Schulman")
+        is_schulman = schulman_model is not None and isinstance(self.model, schulman_model)
+        
+        if is_schulman:
+            v_range = np.linspace(0.0, 4.5, 1000)  # 0 to 4.5V for Schulman, matches main view
+        else:
+            v_range = np.linspace(-3.0, 3.0, 1000)  # Default range for Simplified
+            
+        i_values = self.model.iv_characteristic(v_range)
+        
+        # Function to update the analysis with current parameters
+        def update_analysis():
+            # Get parameter values (or None for auto)
+            height = None
+            if height_spin.value() > 0:
+                height = height_spin.value() / 100.0 * (np.max(i_values) - np.min(i_values))
+                
+            distance = None
+            if distance_spin.value() > 0:
+                distance = distance_spin.value()
+                
+            prominence = None
+            if prominence_spin.value() > 0:
+                prominence = prominence_spin.value() / 100.0 * (np.max(i_values) - np.min(i_values))
+                
+            # Create parameters dict
+            peak_params = {
+                'height': height,
+                'distance': distance,
+                'prominence': prominence,
+                'rel_height': rel_height_spin.value(),
+            }
+            
+            # Plot analysis with updated parameters
+            analysis_plotter.plot_advanced_iv_analysis(v_range, i_values, peak_params)
+            canvas.draw()
+        
+        # Function to export results
+        def export_results():
+            # Get save location from user
+            file_dialog = QFileDialog()
+            save_path, _ = file_dialog.getSaveFileName(
+                dialog,
+                "Save Analysis Results",
+                "",
+                "CSV Files (*.csv);;All Files (*)"
+            )
+            
+            if not save_path:
+                return
+                
+            # Ensure file has .csv extension
+            if not save_path.lower().endswith('.csv'):
+                save_path += '.csv'
+                
+            # Get current peak detection parameters
+            height = None
+            if height_spin.value() > 0:
+                height = height_spin.value() / 100.0 * (np.max(i_values) - np.min(i_values))
+                
+            distance = None
+            if distance_spin.value() > 0:
+                distance = distance_spin.value()
+                
+            prominence = None
+            if prominence_spin.value() > 0:
+                prominence = prominence_spin.value() / 100.0 * (np.max(i_values) - np.min(i_values))
+                
+            # Create parameters dict and run analysis
+            peak_params = {
+                'height': height,
+                'distance': distance,
+                'prominence': prominence,
+                'rel_height': rel_height_spin.value(),
+            }
+            
+            # Run analysis to get results for export
+            results = self.analyzer.advanced_peak_detection(v_range, i_values, **peak_params)
+            
+            # Create DataFrames for peaks and valleys
+            if results['peaks']:
+                peaks_df = pd.DataFrame(results['peaks'])
+                peaks_df.to_csv(save_path, index=False)
+                
+                # If we have valleys, save them to a separate file
+                if results['valleys']:
+                    valley_path = save_path.replace('.csv', '_valleys.csv')
+                    valleys_df = pd.DataFrame(results['valleys'])
+                    valleys_df.to_csv(valley_path, index=False)
+        
+        # Function to show help dialog
+        def show_help():
+            help_text = """
+            <h3>Peak Detection Parameters</h3>
+            <p><b>Height:</b> Minimum peak height required. Peaks below this height will be ignored.</p>
+            <p><b>Distance:</b> Minimum number of samples between neighboring peaks.</p>
+            <p><b>Prominence:</b> Prominence of a peak measures how much it stands out due to its height and position relative to other peaks.</p>
+            <p><b>Rel. Height:</b> Relative height at which peak width is measured (between 0-1).</p>
+            
+            <h3>Understanding the Analysis</h3>
+            <p>The top plot shows the IV curve with detected peaks and valleys. Peak colors indicate sharpness (red = sharp, blue = rounded).</p>
+            <p>Width markers show the width of each peak at the specified relative height.</p>
+            <p>The middle plots show the first and second derivatives, which help in understanding peak characteristics.</p>
+            <p>The bottom section provides detailed information about each detected peak and valley.</p>
+            """
+            
+            msg = QMessageBox()
+            msg.setWindowTitle("Peak Detection Help")
+            msg.setTextFormat(Qt.TextFormat.RichText)
+            msg.setText(help_text)
+            msg.exec()
+        
+        # Connect signals
+        update_btn.clicked.connect(update_analysis)
+        export_btn.clicked.connect(export_results)
+        help_btn.clicked.connect(show_help)
+        
+        # Initial plot
+        update_analysis()
         
         # Show dialog
         dialog.exec()

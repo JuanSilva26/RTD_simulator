@@ -58,6 +58,17 @@ Located in `rtd_simulator/view/`
   - `RTDParameterSection`: Controls for RTD model parameters
   - `SimulationParameterSection`: Controls for simulation settings
   - `PulseParameterSection`: Controls for pulse signal generation
+    - Pulse type selection (Square, Sine, Triangle, Sawtooth)
+    - Amplitude control with unit selection
+      - Supports V, mV, µV units
+      - Automatic value scaling
+      - Range: 0.1V to 5V (or equivalent in other units)
+    - Frequency control with unit selection
+      - Supports Hz, kHz, MHz, GHz units
+      - Automatic value scaling
+      - Range: 0.001Hz to 1GHz (or equivalent in other units)
+    - Duty cycle control (1% to 99%)
+    - DC offset control (-5V to 5V)
 
 - `Plotting`
   - `RTDPlotter`: Handles all plotting functionality
@@ -94,7 +105,11 @@ Located in `rtd_simulator/controller/`
 - Time-domain simulation of RTD behavior
 - Supports:
   - DC bias voltage
-  - Pulse signals (square, sine, triangle, sawtooth)
+  - Pulse signals with advanced configuration:
+    - Multiple waveform types (square, sine, triangle, sawtooth)
+    - Wide frequency range (Hz to GHz)
+    - Fine-grained amplitude control (V to µV)
+    - Adjustable duty cycle and offset
   - Customizable simulation duration and time step
 
 ### 3. Analysis
@@ -164,6 +179,9 @@ rtd_simulator/
 ## Key Features
 
 - Interactive parameter adjustment
+  - Smart unit handling for all parameters
+  - Automatic value scaling and conversion
+  - Unit-aware validation and limits
 - Real-time visualization
 - Multiple analysis tools
 - Export capabilities

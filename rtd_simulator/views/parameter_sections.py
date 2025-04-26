@@ -4,9 +4,9 @@ Parameter section components for the RTD simulation platform.
 This module contains the parameter sections used in the sidebar of the main window.
 """
 
-from typing import Callable, Dict, Optional
+from typing import Callable, Dict, Optional, List, Tuple
 from PyQt6.QtWidgets import (QWidget, QVBoxLayout, QFormLayout, QHBoxLayout,
-                            QComboBox, QFrame, QLabel, QGridLayout)
+                            QComboBox, QFrame, QLabel, QGridLayout, QDoubleSpinBox)
 from PyQt6.QtCore import Qt, pyqtSignal
 from .custom_widgets import ModernSliderSpinBox, CollapsibleSection, InfoButton
 
@@ -395,6 +395,109 @@ class SimulationParameterSection(CollapsibleSection):
                 'vbias': self.vbias_spin.value()
             }
 
+class UnitSelectionSpinBox(QWidget):
+    """SpinBox with unit selection."""
+    
+    valueChanged = pyqtSignal(float)  # Emits the scaled value
+    
+    def __init__(
+        self,
+        label: str,
+        units: List[Tuple[str, float]],  # List of (unit_name, scale_factor)
+        tooltip: str,
+        min_val: float,
+        max_val: float,
+        step: float,
+        decimals: int,
+        parent: Optional[QWidget] = None
+    ):
+        """Initialize the widget.
+        
+        Args:
+            label: Parameter label
+            units: List of (unit_name, scale_factor) tuples
+            tooltip: Parameter tooltip
+            min_val: Minimum value
+            max_val: Maximum value
+            step: Step size
+            decimals: Number of decimal places
+            parent: Optional parent widget
+        """
+        super().__init__(parent)
+        
+        self.units = dict(units)  # Convert to dict for easy lookup
+        self.base_min = min_val
+        self.base_max = max_val
+        self.base_step = step
+        
+        layout = QHBoxLayout()
+        layout.setContentsMargins(0, 0, 0, 0)
+        
+        # Create the spinbox
+        self.spinbox = ModernSliderSpinBox(
+            label, units[0][0],  # Use first unit as default
+            tooltip,
+            min_val, max_val, step, decimals
+        )
+        layout.addWidget(self.spinbox)
+        
+        # Create the unit selector
+        self.unit_combo = QComboBox()
+        self.unit_combo.addItems([u[0] for u in units])
+        self.unit_combo.setToolTip(f"Select {label} unit")
+        self.unit_combo.currentTextChanged.connect(self._on_unit_changed)
+        layout.addWidget(self.unit_combo)
+        
+        self.setLayout(layout)
+        
+        # Connect spinbox value changed signal
+        self.spinbox.valueChanged.connect(self._on_value_changed)
+        
+    def _on_unit_changed(self, unit: str) -> None:
+        """Handle unit changes.
+        
+        Args:
+            unit: Selected unit
+        """
+        scale = self.units[unit]
+        current_value = self.spinbox.value() * self.units[self.spinbox.unit]
+        
+        # Update spinbox settings
+        self.spinbox.setRange(self.base_min / scale, self.base_max / scale)
+        self.spinbox.setStep(self.base_step / scale)
+        self.spinbox.unit = unit
+        
+        # Update value maintaining the actual physical value
+        self.spinbox.setValue(current_value / scale)
+        
+    def _on_value_changed(self, value: float) -> None:
+        """Handle spinbox value changes.
+        
+        Args:
+            value: New spinbox value
+        """
+        # Emit the scaled value
+        scale = self.units[self.unit_combo.currentText()]
+        self.valueChanged.emit(value * scale)
+        
+    def value(self) -> float:
+        """Get the current value in base units.
+        
+        Returns:
+            Current value scaled to base units
+        """
+        scale = self.units[self.unit_combo.currentText()]
+        return self.spinbox.value() * scale
+        
+    def setValue(self, value: float) -> None:
+        """Set the current value in base units.
+        
+        Args:
+            value: Value in base units
+        """
+        scale = self.units[self.unit_combo.currentText()]
+        self.spinbox.setValue(value / scale)
+
 class PulseParameterSection(CollapsibleSection):
     """Section for pulse signal parameters."""
     
@@ -420,22 +523,33 @@ class PulseParameterSection(CollapsibleSection):
         pulse_type_widget.setLayout(pulse_type_layout)
         self.addWidget(pulse_type_widget)
         
-        # Amplitude control
-        self.pulse_amplitude_spin = ModernSliderSpinBox(
-            "Amplitude", "V",
+        # Amplitude control with unit selection (V, mV, µV)
+        self.pulse_amplitude_spin = UnitSelectionSpinBox(
+            "Amplitude",
+            [
+                ("V", 1.0),
+                ("mV", 1e-3),
+                ("µV", 1e-6)
+            ],
             "Pulse signal amplitude",
-            0.1, 5.0, 0.1, 2
+            0.1, 5.0, 0.1, 3
         )
-        self.pulse_amplitude_spin.setValue(1.0)
+        self.pulse_amplitude_spin.setValue(1.0)  # Set default to 1V
         self.addWidget(self.pulse_amplitude_spin)
         
-        # Frequency and cycle time controls
-        self.pulse_freq_spin = ModernSliderSpinBox(
-            "Frequency", "Hz",
+        # Frequency control with unit selection (Hz, kHz, MHz, GHz)
+        self.pulse_freq_spin = UnitSelectionSpinBox(
+            "Frequency",
+            [
+                ("Hz", 1.0),
+                ("kHz", 1e3),
+                ("MHz", 1e6),
+                ("GHz", 1e9)
+            ],
             "Pulse signal frequency",
-            0.001, 1.0, 0.001, 3
+            0.001, 1e9, 0.001, 3
         )
-        self.pulse_freq_spin.setValue(0.04)
+        self.pulse_freq_spin.setValue(0.04)  # Set default to 0.04 Hz
         self.addWidget(self.pulse_freq_spin)
         
         # Duty cycle control
@@ -464,8 +578,8 @@ class PulseParameterSection(CollapsibleSection):
         """
         return {
             'pulse_type': self.pulse_type_combo.currentText(),
-            'pulse_amplitude': self.pulse_amplitude_spin.value(),
-            'pulse_frequency': self.pulse_freq_spin.value(),
+            'pulse_amplitude': self.pulse_amplitude_spin.value(),  # Returns value in base units (V)
+            'pulse_frequency': self.pulse_freq_spin.value(),  # Returns value in base units (Hz)
             'duty_cycle': self.duty_cycle_spin.value(),
             'offset': self.offset_spin.value()
         } 

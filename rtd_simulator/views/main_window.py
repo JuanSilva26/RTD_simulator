@@ -4,23 +4,40 @@ Main window for RTD simulation GUI.
 
 from typing import Optional, Dict, Any, cast
 import numpy as np
-from PyQt6.QtWidgets import (QMainWindow, QWidget, QVBoxLayout, QHBoxLayout,
-                            QPushButton, QLabel, QFrame, QToolBar, QComboBox, QFileDialog)
+
+# Qt imports
+from PyQt6.QtWidgets import (
+    QMainWindow, QWidget, QVBoxLayout, QHBoxLayout,
+    QPushButton, QLabel, QFrame, QToolBar, QComboBox, QFileDialog
+)
 from PyQt6.QtCore import QTimer, Qt
+
+# Matplotlib imports
 from matplotlib.backends.backend_qtagg import FigureCanvasQTAgg
 from matplotlib.backends.backend_qt import NavigationToolbar2QT as NavigationToolbar
 import matplotlib.pyplot as plt
 from matplotlib.figure import Figure
 
-from ..controllers.rtd_controller import RTDController
-from ..models.curve_analysis import CurveAnalyzer
+# Local imports
+from ..controllers import RTDController
+from ..models import CurveAnalyzer, get_rtd_model
+from ..utils.logging import get_logger
 from .plotting import RTDPlotter
-from .custom_widgets import StatusBar, PresetManager, ModernSliderSpinBox, CollapsibleSection
+from .custom_widgets import (
+    StatusBar,
+    PresetManager,
+    ModernSliderSpinBox,
+    CollapsibleSection,
+)
 from .dialogs import ExportDialog, PresetDialog
-from .parameter_sections import (RTDParameterSection, SimulationParameterSection,
-                               PulseParameterSection)
+from .parameter_sections import (
+    RTDParameterSection,
+    SimulationParameterSection,
+    PulseParameterSection,
+)
 from .animation_window import AnimationWindow
-from ..models.base import get_rtd_model
+
+logger = get_logger(__name__)
 
 class MainWindow(QMainWindow):
     """Main window for RTD simulation application."""
@@ -33,6 +50,7 @@ class MainWindow(QMainWindow):
             parent: Parent widget (optional)
         """
         super().__init__(parent)
+        logger.debug("Initializing MainWindow")
         
         # Create figure first
         self.figure = Figure(figsize=(12, 8))
@@ -56,6 +74,7 @@ class MainWindow(QMainWindow):
         
         # Start timer after initial simulation
         self.update_timer.start()
+        logger.info("MainWindow initialization complete")
         
     def init_ui(self):
         """Initialize the user interface."""
@@ -154,7 +173,7 @@ class MainWindow(QMainWindow):
         
         # Add analysis buttons
         iv_analysis_btn = QPushButton("IV Analysis")
-        iv_analysis_btn.setToolTip("Show detailed IV curve analysis")
+        iv_analysis_btn.setToolTip("Show advanced IV curve analysis with peak detection")
         iv_analysis_btn.clicked.connect(self.show_iv_analysis)
         self.toolbar.addWidget(iv_analysis_btn)
         
@@ -239,6 +258,7 @@ class MainWindow(QMainWindow):
             
             # Update status
             self.status_bar.set_status("Updating simulation...")
+            logger.debug("Parameters changed, updating simulation")
             
             # Update controller parameters
             self.controller.update_parameters(**rtd_params)
@@ -267,9 +287,11 @@ class MainWindow(QMainWindow):
             
             # Update status
             self.status_bar.set_status("Ready")
+            logger.debug("Simulation update complete")
             
         except Exception as e:
-            print(f"Error updating parameters: {e}")
+            error_msg = f"Error updating parameters: {str(e)}"
+            logger.error(error_msg, exc_info=True)
             self.status_bar.set_status(f"Error: {str(e)}")
         
     def _update_plot(self) -> None:
@@ -283,7 +305,8 @@ class MainWindow(QMainWindow):
                 })
                 self.canvas.draw()
         except Exception as e:
-            print(f"Error updating plot: {e}")
+            error_msg = f"Error updating plot: {str(e)}"
+            logger.error(error_msg, exc_info=True)
             self.status_bar.set_status(f"Error: {str(e)}")
         
     def show_export_dialog(self):
@@ -302,8 +325,13 @@ class MainWindow(QMainWindow):
                 self._load_preset(selected_preset)
             
     def show_iv_analysis(self):
-        """Show IV curve analysis window."""
-        self.controller.show_iv_analysis()
+        """Show IV curve analysis window with advanced peak detection."""
+        self.controller.show_advanced_iv_analysis()
+        
+    def show_advanced_peak_detection(self):
+        """Legacy method that redirects to IV analysis with peak detection."""
+        # Redirecting to the main IV analysis method for backward compatibility
+        self.show_iv_analysis()
         
     def show_dynamics_analysis(self):
         """Show dynamics analysis window."""

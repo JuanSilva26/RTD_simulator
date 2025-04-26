@@ -1,0 +1,53 @@
+[build-system]
+requires = ["setuptools>=61.0", "wheel"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "rtd_simulator"
+version = "0.1.0"
+description = "A simulator for RTD (Resonant Tunneling Diode) devices"
+readme = "README.md"
+requires-python = ">=3.8"
+license = { text = "MIT" }
+authors = [{ name = "Your Name", email = "your.email@example.com" }]
+dependencies = [
+    "numpy>=1.21.0",
+    "torch>=1.9.0",
+    "matplotlib>=3.4.0",
+    "scipy>=1.7.0",
+]
+
+[project.optional-dependencies]
+dev = [
+    "black>=23.0.0",
+    "flake8>=6.0.0",
+    "mypy>=1.0.0",
+    "pytest>=7.0.0",
+    "pytest-cov>=4.0.0",
+    "pre-commit>=3.0.0",
+]
+
+[project.scripts]
+rtd-simulator = "rtd_simulator.app:main"
+
+[tool.black]
+line-length = 88
+target-version = ['py38']
+include = '\.pyi?$'
+
+[tool.flake8]
+max-line-length = 88
+extend-ignore = ["E203"]
+exclude = [".git", "__pycache__", "build", "dist", "*.egg-info"]
+
+[tool.mypy]
+python_version = "3.8"
+warn_return_any = true
+warn_unused_configs = true
+disallow_untyped_defs = true
+check_untyped_defs = true
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+python_files = ["test_*.py"]
+addopts = "--cov=rtd_simulator --cov-report=term-missing"

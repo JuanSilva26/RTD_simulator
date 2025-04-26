@@ -1,80 +1,133 @@
-# RTD Simulator Modernization Roadmap
+# RTD Simulator Roadmap
 
-## 1. Modular, SOLID-Inspired Architecture
+## Phase 1: Core Architecture & Robustness (Completed)
 
-- [x] **Refactor codebase** to strictly separate Model, View, Controller (MVC) layers.
-- [x] **Abstract base classes** for RTD models and analyzers; all new models/analyses must inherit interfaces.
-- [x] **Dependency injection**: Pass model, plotter, and config objects via constructors to decouple components and ease testing.
-- [x] **Plugin-ready design**: Use dynamic import/registration for models and analysis tools (Open/Closed Principle).
+### 1.1 Project Structure & Packaging
 
-## 2. Profiling & Benchmarking
+- [x] Implement MVC architecture
+- [x] Modernize packaging system
+  - [x] Migrate from `setup.py` to `pyproject.toml`
+  - [x] Consolidate dependencies in `pyproject.toml`
+  - [x] Add proper entry points for CLI
+  - [x] Define proper package metadata
+- [x] Fix import paths and consistency
+  - [x] Update all relative imports to use correct paths
+  - [x] Ensure consistent naming (`models/` vs `model/`)
+  - [x] Add proper `__init__.py` files
+  - [x] Fix circular imports
 
-- [ ] **Integrate cProfile**: Wrap simulation and analysis calls, output .prof files for flamegraph tools.
-- [ ] **Add line_profiler/pyinstrument**: Enable per-line timing for numerical routines; document usage in README.
-- [ ] **Automated profiling scripts**: Provide scripts to benchmark common workflows and output bottleneck reports.
+### 1.2 Code Quality & Maintainability
 
-## 3. Data Handling Enhancements
+- [x] Implement comprehensive type hints
+  - [x] Add return type hints to base model methods
+  - [x] Add proper type annotations for base model data structures
+  - [x] Use `typing` module for complex types in base model
+  - [x] Add type aliases for better readability
+  - [x] Add type hints to SimplifiedRTDModel implementation
+  - [x] Add type hints to SchulmanRTDModel implementation
+  - [x] Add type hints to controller methods
+  - [x] Add type hints to view components
+- [x] Improve error handling and logging
+  - [x] Create centralized logging configuration
+  - [x] Replace print statements with proper logging
+  - [x] Add structured error handling in critical paths
+  - [x] Implement log rotation and formatting
+- [x] Code style and formatting
+  - [x] Add Black for consistent formatting
+  - [x] Implement flake8 for linting
+  - [x] Add pre-commit hooks
 
-- [x] **NumPy vectorization**: Refactor all array computations (IV, simulation, analysis) to use vectorized NumPy ops.
-- [ ] **Memory-mapping**: For large/long simulations, use numpy.memmap for out-of-core data access.
-- [ ] **Efficient export**: Batch data writes, support streaming to CSV/HDF5 for large datasets.
+## Phase 2: Core Functionality & Performance (Completed)
 
-## 4. Plotting Optimization
+### 2.1 Physics & Numerics
 
-- [x] **Matplotlib blitting**: Refactor real-time plots to use blitting for fast updates.
-- [x] **Minimize artist count**: Batch data into single Line2D objects, reduce dynamic text/markers.
-- [x] **Profile redraws**: Use Matplotlib's built-in timers to benchmark and optimize plot update speed.
+- [x] Centralize numerical methods
+  - [x] Move RK4 implementation to models layer
+  - [x] Create abstract numerical methods interface
+  - [x] Implement proper time-stepping abstraction
+- [x] Performance optimization
+  - [x] Implement Numba-accelerated simulation
+  - [x] Add vectorized operations where possible
+  - [x] Implement lazy IV-curve caching
+  - [x] Add performance benchmarks
 
-## 5. Threaded/Background Simulation
+### 2.2 Model Architecture
 
-- [x] **Move simulations to QThread/QThreadPool**: Prevent UI freezes by running long computations in background threads.
-- [x] **Signal-slot communication**: Use PyQt signals to update UI safely from worker threads.
-- [x] **Progress reporting**: Add progress bars/cancellation for long simulations.
+- [x] Implement plugin system
+- [x] Add plugin documentation
+- [x] Create validation framework for plugins
+- [x] Add simulation boundary checks
+  - [x] Implement voltage range validation
+  - [x] Add current limit checks
+  - [x] Add stability boundary detection
+- [x] Create example plugins
+  - [x] Add basic RTD model example
+  - [x] Add visualization plugin
 
-## 6. Automated Testing & CI
+## Phase 3: UI & User Experience (Current Focus)
 
-- [ ] **pytest**: Write/expand unit and integration tests for all modules.
-- [ ] **Mocking**: Use unittest.mock for hardware/external dependencies.
-- [ ] **GitHub Actions**: Set up CI to run lint, type-check, and tests on push/PR.
-- [ ] **Coverage**: Track and improve test coverage.
+### 3.1 UI Improvements
 
-## 7. Plugin/Extensibility System
+- [x] Modernize UI components
+  - [x] Improve responsive layout
+  - [x] Add unit selection for pulse parameters
+    - [x] Amplitude units (V, mV, µV)
+    - [x] Frequency units (Hz, kHz, MHz, GHz)
+- [ ] Enhanced visualization
+  - [ ] Add real-time parameter effects preview
+  - [ ] Implement interactive plot controls
 
-- [x] **Dynamic model/analysis loading**: Allow new RTD models and analysis tools to be added as plugins (no core code change).
-- [x] **Plugin registry**: Maintain a registry for available models/analyses, auto-discover on startup.
-- [ ] **Developer docs**: Document plugin API and provide templates.
+### 3.2 User Experience Enhancements
 
-## 8. Documentation & Developer Onboarding
+- [x] Improved unit handling
+  - [x] Smart unit conversion for all parameters
+  - [x] Consistent unit display across UI
+  - [x] Unit-aware value validation
+- [ ] Parameter presets
+  - [ ] Save/load parameter configurations
+  - [ ] Default presets for common scenarios
+- [ ] Contextual help
+  - [ ] Parameter tooltips with physical explanations
+  - [ ] Quick reference guides
 
-- [x] **Update README**: Add architecture overview, profiling/testing instructions, and plugin guide.
-- [x] **Docstrings**: Ensure all public classes/functions are documented.
-- [ ] **Tutorials**: Provide Jupyter notebooks or scripts for common workflows and profiling.
+## Phase 5: Advanced Features
 
----
+### 5.1 Analysis Tools
 
-# Implementation Plan
+- [x] Add peak detection
+  - [ ] Implement curve fitting
+  - [ ] Add statistical analysis
+- [ ] Data export
+  - [ ] Add multiple format support
+  - [ ] Implement batch export
+  - [ ] Add metadata support
 
-1. ~~Refactor architecture for SOLID/MVC and plugin readiness.~~
-2. ~~Integrate profiling tools (cProfile, line_profiler, pyinstrument) and add example scripts.~~
-3. ~~Vectorize and optimize data handling; add memory-mapping for large arrays.~~
-4. ~~Refactor plotting for blitting and artist minimization.~~
-5. ~~Move simulation to background threads with PyQt signal-slot for UI updates.~~
-6. **Next Steps:**
-   - [ ] Set up pytest infrastructure
-   - [ ] Write initial test suite
-   - [ ] Configure GitHub Actions
-   - [ ] Add memory mapping for large simulations
-   - [ ] Create developer documentation
-   - [ ] Add example notebooks
+### 5.2 Extensibility
 
----
+- [ ] Plugin framework
+  - [ ] Add plugin configuration
+  - [ ] Implement plugin dependencies
+  - [ ] Add plugin versioning
+- [ ] API
+  - [ ] Create Python API
+  - [ ] Add REST API support
+  - [ ] Implement remote control
 
-# Next Steps
+## Current Focus
 
-- [ ] Set up pytest infrastructure and write initial tests
-- [ ] Configure GitHub Actions for CI/CD
-- [ ] Implement memory mapping for large simulations
-- [ ] Create developer documentation and tutorials
-- [ ] Add profiling tools and benchmarks
+1. UI Modernization:
+   - [ ] Improve responsive layout
+   - [ ] Add real-time parameter effects preview
+   - [ ] Implement interactive plot controls
+2. Configuration System:
+   - [ ] Align config schema with model parameters
+   - [ ] Add config validation
+   - [ ] Implement config migration
 
-#Run the app: cd /Users/juansilva/Desktop/Cursor_RTD python -m rtd_simulator.app
+## Future Considerations
+
+- Web interface using Pyodide
+- Cloud integration for distributed computing
+- Real-time collaboration features
+- Plugin marketplace
+- Machine learning integration for parameter optimization
