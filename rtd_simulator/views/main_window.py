@@ -12,15 +12,15 @@ from matplotlib.backends.backend_qt import NavigationToolbar2QT as NavigationToo
 import matplotlib.pyplot as plt
 from matplotlib.figure import Figure
 
-from ..controller.rtd_controller import RTDController
-from ..model.rtd_model import SimplifiedRTDModel
-from ..model.curve_analysis import CurveAnalyzer
+from ..controllers.rtd_controller import RTDController
+from ..models.curve_analysis import CurveAnalyzer
 from .plotting import RTDPlotter
 from .custom_widgets import StatusBar, PresetManager, ModernSliderSpinBox, CollapsibleSection
-from .dialogs import ExportDialog
+from .dialogs import ExportDialog, PresetDialog
 from .parameter_sections import (RTDParameterSection, SimulationParameterSection,
                                PulseParameterSection)
 from .animation_window import AnimationWindow
+from ..models.base import get_rtd_model
 
 class MainWindow(QMainWindow):
     """Main window for RTD simulation application."""
@@ -76,8 +76,8 @@ class MainWindow(QMainWindow):
         
         # Create collapsible sidebar
         sidebar = QWidget()
-        sidebar.setMaximumWidth(350)
-        sidebar.setMinimumWidth(250)
+        sidebar.setMaximumWidth(300)  # Reduced from 350
+        sidebar.setMinimumWidth(200)  # Reduced from 250
         sidebar_layout = QVBoxLayout(sidebar)
         sidebar_layout.setContentsMargins(5, 5, 5, 5)
         sidebar_layout.setSpacing(5)
@@ -144,6 +144,12 @@ class MainWindow(QMainWindow):
         export_btn.clicked.connect(self.show_export_dialog)
         self.toolbar.addWidget(export_btn)
         
+        # Add presets button
+        presets_btn = QPushButton("Presets")
+        presets_btn.setToolTip("Manage simulation presets")
+        presets_btn.clicked.connect(self.show_presets_dialog)
+        self.toolbar.addWidget(presets_btn)
+        
         self.toolbar.addSeparator()
         
         # Add analysis buttons
@@ -164,17 +170,6 @@ class MainWindow(QMainWindow):
         
     def create_parameter_sections(self, layout: QVBoxLayout):
         """Create parameter sections in the sidebar."""
-        # Add preset manager at the top
-        self.preset_manager = PresetManager(self)
-        self.preset_manager.presetLoaded.connect(self._load_preset)
-        layout.addWidget(self.preset_manager)
-        
-        # Add separator line
-        line = QFrame()
-        line.setFrameShape(QFrame.Shape.HLine)
-        line.setFrameShadow(QFrame.Shadow.Sunken)
-        layout.addWidget(line)
-        
         # RTD Parameters section
         self.rtd_section = RTDParameterSection()
         self.rtd_section.modelChanged.connect(self._on_model_changed)
@@ -297,6 +292,14 @@ class MainWindow(QMainWindow):
         if dialog.exec() == ExportDialog.DialogCode.Accepted:
             options = dialog.get_export_options()
             self.controller.export_data_and_plots(options)
+            
+    def show_presets_dialog(self):
+        """Show presets management dialog."""
+        dialog = PresetDialog(self)
+        if dialog.exec() == PresetDialog.DialogCode.Accepted:
+            selected_preset = dialog.get_selected_preset()
+            if selected_preset:
+                self._load_preset(selected_preset)
             
     def show_iv_analysis(self):
         """Show IV curve analysis window."""

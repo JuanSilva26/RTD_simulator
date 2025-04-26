@@ -429,16 +429,6 @@ class PulseParameterSection(CollapsibleSection):
         self.pulse_amplitude_spin.setValue(1.0)
         self.addWidget(self.pulse_amplitude_spin)
         
-        # Timing mode selection
-        timing_layout = QFormLayout()
-        self.timing_mode_combo = QComboBox()
-        self.timing_mode_combo.addItems(["Frequency", "Cycle Time"])
-        timing_layout.addRow("Timing Mode:", self.timing_mode_combo)
-        
-        timing_widget = QWidget()
-        timing_widget.setLayout(timing_layout)
-        self.addWidget(timing_widget)
-        
         # Frequency and cycle time controls
         self.pulse_freq_spin = ModernSliderSpinBox(
             "Frequency", "Hz",
@@ -447,15 +437,6 @@ class PulseParameterSection(CollapsibleSection):
         )
         self.pulse_freq_spin.setValue(0.04)
         self.addWidget(self.pulse_freq_spin)
-        
-        self.cycle_time_spin = ModernSliderSpinBox(
-            "Cycle Time", "s",
-            "Pulse signal cycle time",
-            1.0, 1000.0, 1.0, 1
-        )
-        self.cycle_time_spin.setValue(25.0)
-        self.cycle_time_spin.hide()
-        self.addWidget(self.cycle_time_spin)
         
         # Duty cycle control
         self.duty_cycle_spin = ModernSliderSpinBox(
@@ -474,21 +455,6 @@ class PulseParameterSection(CollapsibleSection):
         )
         self.offset_spin.setValue(0.0)
         self.addWidget(self.offset_spin)
-        
-    def setup_timing_mode_handlers(self, 
-                                 on_mode_changed: Callable[[str], None],
-                                 on_freq_changed: Callable[[float], None],
-                                 on_cycle_time_changed: Callable[[float], None]) -> None:
-        """Set up handlers for timing mode changes.
-        
-        Args:
-            on_mode_changed: Handler for timing mode changes
-            on_freq_changed: Handler for frequency changes
-            on_cycle_time_changed: Handler for cycle time changes
-        """
-        self.timing_mode_combo.currentTextChanged.connect(on_mode_changed)
-        self.pulse_freq_spin.valueChanged.connect(on_freq_changed)
-        self.cycle_time_spin.valueChanged.connect(on_cycle_time_changed)
         
     def get_parameters(self) -> Dict[str, float | str]:
         """Get current parameter values.

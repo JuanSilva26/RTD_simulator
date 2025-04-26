@@ -1,5 +1,5 @@
 """
-RTD Controller module for managing Model-View interaction.
+RTD simulation controller.
 """
 
 from typing import Optional, Tuple, Dict, Any, cast
@@ -9,33 +9,82 @@ import pandas as pd
 from datetime import datetime
 from PyQt6.QtWidgets import (QDialog, QVBoxLayout, QWidget, QFileDialog,
                             QToolBar, QMainWindow, QPushButton)
-from PyQt6.QtCore import Qt
+from PyQt6.QtCore import Qt, QObject, pyqtSignal
 from matplotlib.backends.backend_qtagg import FigureCanvasQTAgg
 from matplotlib.backends.backend_qt import NavigationToolbar2QT as NavigationToolbar
 import matplotlib.pyplot as plt
 from matplotlib.figure import Figure
-from ..model.rtd_model import RTDModel, SimplifiedRTDModel, SchulmanRTDModel, PerturbationType
-from ..model.curve_analysis import CurveAnalyzer
-from ..view.plotting import RTDPlotter
+from ..models.base import get_rtd_model, RTDModel, PerturbationType
+from ..models.curve_analysis import CurveAnalyzer
+from ..views.plotting import RTDPlotter
 
-class RTDController:
-    """Controller class for managing RTD simulation and visualization."""
+class RTDController(QObject):
+    """Controller for RTD simulation and analysis."""
     
-    def __init__(self, plotter: RTDPlotter, parent: Optional[QWidget] = None):
+    # Signals
+    simulation_started = pyqtSignal()
+    simulation_finished = pyqtSignal()
+    simulation_error = pyqtSignal(str)
+    progress_updated = pyqtSignal(int)
+    
+    def __init__(self, plotter: RTDPlotter, parent: Optional[QObject] = None):
         """
-        Initialize the controller with model and view components.
+        Initialize the controller.
         
         Args:
-            plotter: RTDPlotter instance
-            parent: Parent widget (optional)
+            plotter: RTDPlotter instance for visualization
+            parent: Parent QObject (optional)
         """
-        self.model: RTDModel = SimplifiedRTDModel()  # Start with simplified model
+        super().__init__(parent)
         self.plotter = plotter
-        self.parent = parent
+        self.model: Optional[RTDModel] = None
+        self._is_running = False
         self.canvas = None
         self.toolbar = None
         self.analyzer = CurveAnalyzer()
         self._current_simulation_data: Optional[Dict[str, np.ndarray]] = None
+                
+    def start_simulation(self, model: RTDModel, params: Dict[str, Any]) -> None:
+        """
+        Start a new simulation.
+        
+        Args:
+            model: RTD model to simulate
+            params: Simulation parameters
+        """
+        self.model = model
+        self._is_running = True
+        self.simulation_started.emit()
+        
+        try:
+            # Run simulation
+            t, v, i = model.simulate(
+                t_end=params['t_end'],
+                dt=params['dt'],
+                vbias=params['vbias']
+            )
+            
+            # Update plot
+            self.plotter.plot_main_view(
+                v_range=params['v_range'],
+                i_values=model.iv_characteristic(params['v_range']),
+                t=t, v=v, i=i,
+                pulse=params.get('pulse', None)
+            )
+            
+            self.simulation_finished.emit()
+            
+        except Exception as e:
+            self.simulation_error.emit(str(e))
+            self._is_running = False
+            
+    def stop_simulation(self) -> None:
+        """Stop the current simulation."""
+        self._is_running = False
+        
+    def is_running(self) -> bool:
+        """Check if a simulation is currently running."""
+        return self._is_running
                 
     def update_parameters(self, **kwargs) -> None:
         """
@@ -47,10 +96,9 @@ class RTDController:
         # Handle model switching
         if 'model_type' in kwargs:
             model_type = kwargs.pop('model_type')
-            if model_type == "Simplified" and not isinstance(self.model, SimplifiedRTDModel):
-                self.model = SimplifiedRTDModel()
-            elif model_type == "Schulman" and not isinstance(self.model, SchulmanRTDModel):
-                self.model = SchulmanRTDModel()
+            model_cls = get_rtd_model(model_type)
+            if model_cls is not None and not isinstance(self.model, model_cls):
+                self.model = model_cls()
         
         # Update remaining parameters
         for param, value in kwargs.items():
@@ -145,7 +193,7 @@ class RTDController:
         pulse = self._current_simulation_data['pulse']
         
         # Create IV curve data with appropriate range based on model type
-        if isinstance(self.model, SchulmanRTDModel):
+        if isinstance(self.model, get_rtd_model("Schulman")):
             v_range = np.linspace(0.0, 4.5, 1000)  # 0 to 4.5V for Schulman
         else:
             v_range = np.linspace(-3.0, 3.0, 1000)  # -3 to 3V for Simplified

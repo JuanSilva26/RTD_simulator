@@ -10,7 +10,7 @@ import numpy as np
 import matplotlib.pyplot as plt
 from matplotlib.figure import Figure
 from matplotlib.gridspec import GridSpec
-from ..model.curve_analysis import CurveAnalyzer
+from ..models.curve_analysis import CurveAnalyzer
 from numpy.typing import NDArray
 from PyQt6.QtWidgets import (QToolBar, QComboBox, QSpinBox,
                            QLabel, QWidget, QHBoxLayout, QPushButton,

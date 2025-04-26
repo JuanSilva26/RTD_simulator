@@ -1,13 +1,13 @@
 """
-Main application entry point for RTD simulation platform.
+Main entry point for the RTD simulator application.
 """
 
 import sys
 from PyQt6.QtWidgets import QApplication
-from .view.main_window import MainWindow
+from .views.main_window import MainWindow
 
 def main():
-    """Run the RTD simulation application."""
+    """Initialize and run the RTD simulator application."""
     app = QApplication(sys.argv)
     window = MainWindow()
     window.show()

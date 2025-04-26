@@ -1,145 +1,80 @@
-# RTD Simulation Platform Development Roadmap
+# RTD Simulator Modernization Roadmap
 
-## Completed Features [✅]
-### Core Architecture
-- [x] Project structure and dependencies
-- [x] Basic RTD model with voltage-current relationship
-- [x] Parameter validation and ranges
-- [x] Initial state configuration
-- [x] Simulation loop with time stepping
+## 1. Modular, SOLID-Inspired Architecture
 
-### Visualization
-- [x] IV curve calculation and plotting
-- [x] Voltage vs time plots
-- [x] Phase space plotting
-- [x] Subplot layouts
-- [x] Plot customization options
-- [x] Data export functionality
-- [x] Plot layout customization
-  - [x] Standard layout
-  - [x] IV focus layout
-  - [x] Time series focus layout
-  - [x] Equal grid layout
-- [x] Plot animation controls
-  - [x] Play/Pause functionality
-  - [x] Reset capability
-  - [x] Variable speed control
-  - [x] Smooth animation rendering
+- [x] **Refactor codebase** to strictly separate Model, View, Controller (MVC) layers.
+- [x] **Abstract base classes** for RTD models and analyzers; all new models/analyses must inherit interfaces.
+- [x] **Dependency injection**: Pass model, plotter, and config objects via constructors to decouple components and ease testing.
+- [x] **Plugin-ready design**: Use dynamic import/registration for models and analysis tools (Open/Closed Principle).
 
-### Signal Generation
-- [x] Multiple pulse types (square, sine, triangle, sawtooth)
-- [x] Pulse parameter controls
-- [x] Real-time updating
+## 2. Profiling & Benchmarking
 
-### UI/UX
-- [x] Collapsible parameter sidebar
-- [x] Parameter sections with hierarchy
-- [x] Status bar with simulation info
-- [x] PyQt6 compatibility fixes
-- [x] Preset system for parameters
-- [x] Plot toolbar with essential controls
-- [x] Zoom/pan in plots
+- [ ] **Integrate cProfile**: Wrap simulation and analysis calls, output .prof files for flamegraph tools.
+- [ ] **Add line_profiler/pyinstrument**: Enable per-line timing for numerical routines; document usage in README.
+- [ ] **Automated profiling scripts**: Provide scripts to benchmark common workflows and output bottleneck reports.
 
-## Current Development Phase
-### Model Enhancement [Highest Priority]
-- [ ] Implement Schulman RTD Model
-  - [ ] Create abstract RTDModel base class
-  - [ ] Refactor existing model to SimplifiedRTDModel
-  - [ ] Implement SchulmanRTDModel with physical parameters
-  - [ ] Add model selection UI
-  - [ ] Update parameter inputs for each model
-  - [ ] Add validation for physical parameters
-  - [ ] Implement circuit dynamics (dV/dt, dI/dt)
-  - [ ] Add temperature dependence
-  - [ ] Create comparison plots between models
+## 3. Data Handling Enhancements
 
-### UI Enhancements [In Progress]
-- [WIP] Modern slider+input combinations
-  - [ ] Design custom QWidget combining slider and spinbox
-  - [ ] Add value validation and range enforcement
-  - [ ] Implement smooth value updates
-  - [ ] Add units display support
-- [ ] Interactive parameter adjustment via plots
-- [ ] Parameter validation with visual feedback
-- [ ] Undo/redo system
-- [ ] Parameter search/filter
-- [ ] Accessibility improvements
-  - [ ] Keyboard shortcuts
-  - [ ] Screen reader support
-  - [ ] High contrast mode
+- [x] **NumPy vectorization**: Refactor all array computations (IV, simulation, analysis) to use vectorized NumPy ops.
+- [ ] **Memory-mapping**: For large/long simulations, use numpy.memmap for out-of-core data access.
+- [ ] **Efficient export**: Batch data writes, support streaming to CSV/HDF5 for large datasets.
 
-### Code Quality & Organization [Priority]
-- [ ] Reorganize test files from examples/ to tests/
-- [ ] Remove redundant src/ directory
-- [ ] Consolidate analysis/ into model/ or controller/
-- [ ] Add comprehensive unit tests
-- [ ] Improve documentation coverage
-- [ ] Add type hints throughout codebase
+## 4. Plotting Optimization
 
-### Performance Optimization
-- [ ] Profile and optimize simulation loop
-- [ ] Implement parallel processing for heavy computations
-- [ ] Add GPU acceleration support
-- [ ] Optimize memory usage for long simulations
-- [ ] Cache frequently used calculations
+- [x] **Matplotlib blitting**: Refactor real-time plots to use blitting for fast updates.
+- [x] **Minimize artist count**: Batch data into single Line2D objects, reduce dynamic text/markers.
+- [x] **Profile redraws**: Use Matplotlib's built-in timers to benchmark and optimize plot update speed.
 
-### Advanced Analysis
-- [ ] Parameter sweep functionality
-- [ ] Bifurcation analysis
-- [ ] Noise and temperature effects
-- [ ] State space analysis tools
-- [ ] Numerical stability checks
+## 5. Threaded/Background Simulation
 
-## Future Considerations
-### Enhanced Analysis
-- [ ] Frequency response analysis
-- [ ] Stability analysis
-- [ ] Parameter sensitivity analysis
-- [ ] Statistical analysis tools
+- [x] **Move simulations to QThread/QThreadPool**: Prevent UI freezes by running long computations in background threads.
+- [x] **Signal-slot communication**: Use PyQt signals to update UI safely from worker threads.
+- [x] **Progress reporting**: Add progress bars/cancellation for long simulations.
 
-### Advanced Visualization
-- [ ] Interactive 3D phase space plots
-- [ ] Real-time FFT visualization
-- [ ] Parameter space exploration
-- [ ] Bifurcation diagram animation
+## 6. Automated Testing & CI
 
-### Simulation Extensions
-- [ ] Multiple RTD models
-- [ ] Circuit element integration
-- [ ] Temperature modeling
-- [ ] Custom model creation
+- [ ] **pytest**: Write/expand unit and integration tests for all modules.
+- [ ] **Mocking**: Use unittest.mock for hardware/external dependencies.
+- [ ] **GitHub Actions**: Set up CI to run lint, type-check, and tests on push/PR.
+- [ ] **Coverage**: Track and improve test coverage.
 
-## Technical Stack
-- Python 3.8+
-- NumPy, SciPy for computation
-- PyQt6 for GUI
-- Matplotlib for plotting
-- pytest for testing
-- Git for version control
+## 7. Plugin/Extensibility System
 
-## Development Guidelines
-### Code Organization (MVC)
-- Model: RTD simulation engine, calculations
-- View: GUI elements, plotting
-- Controller: User input, model-view coordination
+- [x] **Dynamic model/analysis loading**: Allow new RTD models and analysis tools to be added as plugins (no core code change).
+- [x] **Plugin registry**: Maintain a registry for available models/analyses, auto-discover on startup.
+- [ ] **Developer docs**: Document plugin API and provide templates.
 
-### Best Practices
-- Follow PEP 8 style guide
-- Use type hints
-- Write comprehensive tests
-- Document all public APIs
-- Keep files under 300 lines
-- Use descriptive naming
-- Implement proper error handling
+## 8. Documentation & Developer Onboarding
 
-## Next Steps
-1. ✅ Implement zoom/pan in plots
-2. ✅ Add plot animation controls
-3. [ ] Add data persistence
-4. [ ] Implement configuration system
-5. [ ] Add numerical stability checks
-6. [ ] Optimize performance
-7. [ ] Add comprehensive testing
-8. [ ] Improve documentation 
+- [x] **Update README**: Add architecture overview, profiling/testing instructions, and plugin guide.
+- [x] **Docstrings**: Ensure all public classes/functions are documented.
+- [ ] **Tutorials**: Provide Jupyter notebooks or scripts for common workflows and profiling.
+
+---
+
+# Implementation Plan
+
+1. ~~Refactor architecture for SOLID/MVC and plugin readiness.~~
+2. ~~Integrate profiling tools (cProfile, line_profiler, pyinstrument) and add example scripts.~~
+3. ~~Vectorize and optimize data handling; add memory-mapping for large arrays.~~
+4. ~~Refactor plotting for blitting and artist minimization.~~
+5. ~~Move simulation to background threads with PyQt signal-slot for UI updates.~~
+6. **Next Steps:**
+   - [ ] Set up pytest infrastructure
+   - [ ] Write initial test suite
+   - [ ] Configure GitHub Actions
+   - [ ] Add memory mapping for large simulations
+   - [ ] Create developer documentation
+   - [ ] Add example notebooks
+
+---
+
+# Next Steps
+
+- [ ] Set up pytest infrastructure and write initial tests
+- [ ] Configure GitHub Actions for CI/CD
+- [ ] Implement memory mapping for large simulations
+- [ ] Create developer documentation and tutorials
+- [ ] Add profiling tools and benchmarks
 
 #Run the app: cd /Users/juansilva/Desktop/Cursor_RTD python -m rtd_simulator.app
